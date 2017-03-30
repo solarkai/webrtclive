@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="keywords" content="JavaScript, WebRTC" />
+<meta name="description" content="WebRTC codelab" />
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1">
+<title>WebRTC Caller</title>
+<style></style>
+<!-- script src='js/lib/adapter.js'></script -->
+</head>
+
+<body>
+<video id="localVideo" autoplay muted></video>
+<!-- video id="html5Video"  width="568" height="320" autoplay>
+  <source src="webrtcTest.mp4" type="video/mp4">
+</video -->
+<div style="float:right;width:50%;">
+  <h2 >SDP Description:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</h2>
+  <textarea id="remoteSdpDesc" cols="200" rows="200" style="width:100%; height:auto; border-style:double;background-color:#6FF"></textarea>
+</div>
+<div>
+  <button id="startButton">Get Stream</button>
+  <button id="createOfferButton">Create Offer</button>
+  <button id="setRemoteDescriptionButton">Set Remote SDP</button>
+  <button id="addRemoteCandidate">Add Remote ICECandidates</button>
+  <button id="sendChannelButton">Send msg by channel</button>
+  <button id="hangupButton">Hang Up</button>
+  <h2 >Datachannel data:</h2>
+  <input id="txtDataChannel"  type="text"  style="width:40%; height:auto; color:#03F" onFocus="{this.value='';this.style.color='#03F';}"/> 
+  <h2 >ICE Candidates:</h2>
+  <textarea id="remoteCandidates" cols="200" rows="50" style=" float:left;width:40%; height:auto; border-style:double;background-color:#6FF"></textarea>
+</div>
+<div id="logprint" style="clear:both; background-color:#09F"> </div>
+<script>
+    var pc_config = {'iceServers':[{'url':'stun:23.21.150.121'}]} ;
+	var pc_constraints = {
+						  'optional': [
+						  {'DtlsSrtpKeyAgreement': true}
+						  ]};
+						  
+	var  localStream, localPeerConnection;
+	var  remoteCandidateArray=[];
+	var  remoteCandidateIndex = 0;
+	var  localChannel,receiveChannel;
+	var  pcArrayDesc = [];
+	
+	var localVideo = document.getElementById("localVideo");
+	var createOfferButton = document.getElementById("createOfferButton");
+	var setRemoteDescriptionButton = document.getElementById("setRemoteDescriptionButton");
+	var hangupButton = document.getElementById("hangupButton");
+	var remoteSdpDesc = document.getElementById("remoteSdpDesc");
+	var addRemoteCandidate = document.getElementById("addRemoteCandidate");
+	var remoteCandidates = document.getElementById("remoteCandidates");
+	var sendChannelButton =  document.getElementById("sendChannelButton");
+	var txtDataChannel = document.getElementById("txtDataChannel");
+	//var html5Video = document.getElementById("html5Video");
+	
+	//设置按钮状态
+	startButton.disabled = false;
+	createOfferButton.disabled = true;
+	setRemoteDescriptionButton.disabled = true;
+	hangupButton.disabled = true;
+	addRemoteCandidate.disabled = true;
+	sendChannelButton.disabled = true;
+	txtDataChannel.disabled = true;
+	
+	startButton.onclick = start;
+	createOfferButton.onclick = createOffer;
+	setRemoteDescriptionButton.onclick = setRemoteDescription;
+	hangupButton.onclick = hangup;
+	addRemoteCandidate.onclick = addRemoteCandidates;
+	sendChannelButton.onclick = sendMsgByChannel;
+	
+	window.URL = window.URL || window.webkitURL || window.msURL || window.oURL;
+	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia|| navigator.mozGetUserMedia || navigator.msGetUserMedia;
+	// Chrome
+	if (navigator.webkitGetUserMedia) {
+		RTCPeerConnection = webkitRTCPeerConnection;
+		// Firefox
+		} else if(navigator.mozGetUserMedia){
+		RTCPeerConnection = mozRTCPeerConnection;
+		RTCSessionDescription = mozRTCSessionDescription;
+		RTCIceCandidate = mozRTCIceCandidate;
+		}
+	trace("RTCPeerConnection object: " + RTCPeerConnection);
+	
+	function trace(text) {
+	  console.log((performance.now() / 1000).toFixed(3) + ": " + text);
+	}
+	
+	function gotStream(stream){
+	  trace("++++++++++Received local stream");
+	  localVideo.src = URL.createObjectURL(stream);
+	  localStream = stream;
+	  createOfferButton.disabled = false;
+	}
+	
+	/*添加远程的Candidate*/
+	function addRemoteCandidates()
+	{
+	  addRemoteCandidate.disabled = true;
+	  var candidates = remoteCandidates.value;
+	 
+	  remoteCandidateArray = JSON.parse(candidates);
+	  for(var i in remoteCandidateArray)
+	  {
+		  localPeerConnection.addIceCandidate(new RTCIceCandidate(remoteCandidateArray[i]));
+	  }
+	  trace("++++++++++set remoteCandidate from textarea \n");
+	  remoteCandidates.value = "";
+	}
+	
+	//获取摄像头的流
+	function start() {
+	  //html5Video.pause();
+	  trace("++++++++++Requesting local stream");
+	  startButton.disabled = true;
+	  createOfferButton.disabled = false;
+	  
+	  navigator.getUserMedia({audio:true, video:true}, gotStream,
+		function(error) {
+		  trace("getUserMedia error: ", error);
+		});
+	}
+	
+	//呼叫远端的浏览器
+	function createOffer() {
+	  createOfferButton.disabled = true;
+	  hangupButton.disabled = false;
+	  setRemoteDescriptionButton.disabled = false;
+	 
+	  trace("++++++++++Starting call");
+	
+	  if (localStream.getVideoTracks().length > 0) {
+		trace('Using video device: ' + localStream.getVideoTracks()[0].label);
+	  }
+	  if (localStream.getAudioTracks().length > 0) {
+		trace('Using audio device: ' + localStream.getAudioTracks()[0].label);
+	  }
+	
+	  var servers = null;
+	
+	  localPeerConnection = new RTCPeerConnection(servers);//;pc_config, pc_constraints);//
+	  trace("Created local peer connection object localPeerConnection");
+	   
+	  localPeerConnection.oniceconnectionstatechange = goticeConnectionState;
+	  localPeerConnection.onicecandidate = gotLocalIceCandidate;
+	  localPeerConnection.addStream(localStream);
+	  trace("Added localStream to localPeerConnection");
+	  createDatachannel();
+	  
+	  var lp = localPeerConnection;   //闭包测试
+	  pcArrayDesc[localPeerConnection]="zhangkai";
+	  
+	  localPeerConnection.createOffer(function (description){
+				  lp.setLocalDescription(description);
+				  trace("++++++++++Offer from localPeerConnection: \n" + description.sdp);
+				  remoteSdpDesc.value = JSON.stringify(description);
+				},handleError);
+	  //gotLocalDescription,handleError);
+	  
+	}
+	
+	function gotLocalDescription(description){
+	  lp.setLocalDescription(description);
+	  trace("++++++++++Offer from localPeerConnection: \n" + description.sdp);
+	  remoteSdpDesc.value = JSON.stringify(description);
+	}
+	
+	//设置远端的answer回应描述
+	function setRemoteDescription(){
+	  setRemoteDescriptionButton.disabled = true;
+	  addRemoteCandidate.disabled = false;
+	  
+	  var v1 = JSON.parse(remoteSdpDesc.value);
+	  var remotedesc = new RTCSessionDescription(v1);
+	  localPeerConnection.setRemoteDescription(remotedesc);
+	  trace("++++++++++setRemoteDescription from remotePeerConnection: \n" + v1.sdp);
+	  remoteSdpDesc.value = ""; 
+	}
+	
+	function hangup() {
+	  trace("++++++++++Ending call");
+	  localPeerConnection.close();
+	  localPeerConnection = null;
+	  hangupButton.disabled = true;
+	  createOfferButton.disabled = false;
+	}
+	
+	function goticeConnectionState(event)
+	{
+	   trace("++++++++++ ICEConnectionStateDisconnected");
+	}
+	
+	function gotLocalIceCandidate(event){
+	  if (event.candidate) {
+		remoteCandidateArray[remoteCandidateIndex] = event.candidate;
+		remoteCandidateIndex++;
+		remoteCandidates.value = JSON.stringify(remoteCandidateArray);
+		trace("++++++++++Local ICE candidate: \n" + event.candidate.candidate);
+	  }
+	  if(event.currentTarget instanceof RTCPeerConnection)
+	  {
+		trace("++++++++++pc array desc: \n" + pcArrayDesc[event.currentTarget]);  
+	  }
+	}
+	
+	function handleError(){}
+	
+	//创建发送的datachannel
+	function createDatachannel()
+	{ 
+	   try{
+	   	localChannel = localPeerConnection.createDataChannel("localDataChannel",{reliable: true});
+		trace('Created send data channel');
+	   }catch(e)
+	   { alert('Failed to create data channel. ');
+         trace('createDataChannel() failed with exception: ' + e.message);
+	   }
+		localChannel.onopen = handleLocalChannelStateChange;
+		localChannel.onmessage = handleMessage;
+		localChannel.onclose = handleLocalChannelStateChange;
+		localPeerConnection.ondatachannel = gotReceiveChannel;
+	}
+	
+	function handleLocalChannelStateChange()
+	{
+		var readyState = localChannel.readyState;
+        trace('Send channel state is: ' + readyState);
+		// If channel ready, enable user's input
+		if (readyState == "open") {
+		sendChannelButton.disabled = false;
+		txtDataChannel.disabled = false;
+		} else {
+		sendChannelButton.disabled = true;
+		txtDataChannel.disabled = true;
+		}
+	}
+	
+	function handleMessage(event) {
+		txtDataChannel.style.color = '#F00';
+		trace('Received message from channel: ' + event.data);
+		txtDataChannel.value = event.data;
+    }
+	
+	//在发送数据
+	function sendMsgByChannel()
+	{
+		var data = txtDataChannel.value;
+		if(data != "")
+		{
+			localChannel.send(data);
+			trace("Send data from localchannel:"+data);
+			txtDataChannel.value = null;
+		}else
+		{
+			alert("pls input something.");
+		}
+	}
+	
+	function gotReceiveChannel()
+	{
+		trace('Receive Channel Callback');
+        /*receiveChannel = event.channel;
+        receiveChannel.onmessage = handleMessage;
+        receiveChannel.onopen = handleReceiveChannelStateChange;
+        receiveChannel.onclose = handleReceiveChannelStateChange;*/	
+	}
+	
+	
+	
+	
+	
+  </script>
+</body>
+</html>
