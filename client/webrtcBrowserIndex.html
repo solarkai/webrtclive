@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"  >
+<head >
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="initial-scale=1.0,width=device-width" / >
+    <title>webrtc浏览客户端: 未注册</title>
+    <!-- script src="../jquery-1.11.2.min.js"></script -->
+    <!-- script src="testProto.js"></script -->
+    <script src="sdp.js"></script>
+    <script src="webrtcBrowserIndex.js"></script>
+    <link  rel="stylesheet" href="webrtcBrowserIndex.css" type="text/css" media="screen">
+</head>
+
+<body>
+<h2 class='pagetitle'><img src="img/webrtclog.png" width="110" height="76">WebRTC 实时浏览客户端</h2>
+<div  class="pagestatus roundedDivBorder">
+   <img id='pageState' src="img/turnoff.png" width="30" height="35" title="未注册"
+   style="filter:alpha(opacity=50);  -moz-opacity:0.5;  -khtml-opacity: 0.5;  opacity: 0.5; ">
+</div>
+<div id="wrapper"> 
+  <!-- the header and navigation -->
+  <div id="header" class="white">
+    <div id="navigation">
+      <ul>
+        <li><input class='button bigrounded blue' id="agentReg" type="button" value="客户端注册" ></li>
+        <li><input class='button bigrounded blue' id="refreshIpcList" type="button" value="刷新IPC列表"></li>
+        <li><input class='button bigrounded blue' id="mediaReq" type="button" value="浏览IPC视频"></li>
+        <li><input class='button bigrounded blue' id="agentQuit" type="button" value="退出"></li>
+      </ul>
+    </div>
+  </div>
+  <!-- the content -->
+  <div id="sidebar"  class="white roundedDivBorder" hidden="true">
+       <h3><img src="img/camera.png"  width="42" height="42">IPC列表</h3>
+       <ul id="ipclist"/>
+  </div>
+  <div id="content">
+     <!-- div id="video1" class='videoContainer'>
+      <h3>IPC4</h3>
+      <button type="button">关闭</button>
+      <video  autoplay ></video>
+     </div -->
+    
+  </div>
+ 
+</div>
+</body>
+</html>

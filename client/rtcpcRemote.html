@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="keywords" content="JavaScript, WebRTC" />
+    <meta name="description" content="WebRTC codelab" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1">
+    <title>WebRTC Callee</title>
+    <style></style>
+    <!-- script src='js/lib/adapter.js'></script -->
+  </head>
+
+<body>
+  <video id="remoteVideo" autoplay muted></video>
+  <div style="float:right;width:50%;">
+      <h2 style=" float:right;">SDP Description:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</h2>
+      <textarea id="localSdpDesc" cols="400" rows="400" style="width:100%;height:auto; border-style:double;background-color:#0C3"></textarea>
+  </div>
+  <div>
+    <button id="setLocalDescButton">Set Local SDP</button>
+    <button id="addLocalCandidate">Add Remote ICECandidate</button>
+    <button id="hangupButton">Hang Up</button>
+    <h2 >Datachannel data received:</h2>
+    <input id="txtDataChannel"  type="text"  style="width:40%; height:auto; color:#03F"/>
+    <h2>ICE Candidates:</h2>
+    <textarea id="localCandidates" cols="200" rows="50" style=" float:left;width:40%; height:auto; border-style:double;background-color:#0C3"></textarea>
+  </div>
+  <script>
+    var pc_config = {'iceServers':[{'url':'stun:23.21.150.121'}]} ;
+	var pc_constraints = {
+						  'optional': [
+						  {'DtlsSrtpKeyAgreement': true}
+						  ]};
+						  
+	var  remotePeerConnection;
+	var  localCandidateArray = [];
+	var  localCandidateIndex=0;
+	var  receiveChannel;
+	
+	var remoteVideo = document.getElementById("remoteVideo");
+	var setLocalDescButton = document.getElementById("setLocalDescButton");
+	var localSdpDesc = document.getElementById("localSdpDesc");
+	var hangupButton = document.getElementById("hangupButton");
+	var addLocalCandidate = document.getElementById("addLocalCandidate");
+	var localCandidates = document.getElementById("localCandidates");
+	var txtDataChannel =  document.getElementById("txtDataChannel");
+	
+	//初始化按钮状态
+	hangupButton.disabled = true;
+	addLocalCandidate.disabled = true;
+	txtDataChannel.disabled = true;
+	
+	setLocalDescButton.onclick = setLocalDesc;
+	hangupButton.onclick = hangup;
+	addLocalCandidate.onclick = addLocalCandidates;
+	
+	window.URL = window.URL || window.webkitURL || window.msURL || window.oURL;
+	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia|| navigator.mozGetUserMedia || navigator.msGetUserMedia;
+	// Chrome
+	if (navigator.webkitGetUserMedia) {
+		RTCPeerConnection = webkitRTCPeerConnection;
+		// Firefox
+		} else if(navigator.mozGetUserMedia){
+		RTCPeerConnection = mozRTCPeerConnection;
+		RTCSessionDescription = mozRTCSessionDescription;
+		RTCIceCandidate = mozRTCIceCandidate;
+		}
+	trace("RTCPeerConnection object: " + RTCPeerConnection);
+	
+	function trace(text) {
+	  console.log((performance.now() / 1000).toFixed(3) + ": " + text);
+	}
+	
+	/*添加local的Candidate*/
+	function addLocalCandidates()
+	{
+	  addLocalCandidate.disabled = true;
+	  var candidates = localCandidates.value;
+	  localCandidateArray =  JSON.parse(candidates);
+
+	  for(var i in localCandidateArray)
+	  {
+		  remotePeerConnection.addIceCandidate(new RTCIceCandidate(localCandidateArray[i]));
+	  }
+	  trace("++++++++++set localCandidate from textarea \n");
+	  //remoteVideo.play();
+	  localCandidates.value = "";
+	}
+	
+	//获取远端的SDP描述并answer
+	function setLocalDesc() {
+	  hangupButton.disabled = false;
+	  addLocalCandidate.disabled = false;
+	  setLocalDescButton.disabled = true;
+	  
+	  trace("++++++++++Starting call");
+	
+	  var servers = null;
+	
+	  remotePeerConnection = new RTCPeerConnection(servers);//pc_config, pc_constraints);//
+	  trace("Created remote peer connection object remotePeerConnection");
+	  
+	  remotePeerConnection.ondatachannel = gotReceiveChannel;
+	  remotePeerConnection.onicecandidate = gotRemoteIceCandidate;
+	  remotePeerConnection.onaddstream = gotRemoteStream;
+	  remotePeerConnection.oniceconnectionstatechange = goticeConnectionState;
+	
+	  var v1 = JSON.parse(localSdpDesc.value);
+	  var localdesc = new RTCSessionDescription(v1);
+	  
+	  gotLocalDescription(localdesc);
+	  
+	}
+	
+	
+	
+	function gotLocalDescription(description){
+	  trace("++++++++++Offer from localPeerConnection: \n" + description.sdp);
+	  remotePeerConnection.setRemoteDescription(description);
+	  remotePeerConnection.createAnswer(gotRemoteDescription,handleError);
+	}
+	
+	function gotRemoteDescription(description){
+	  remotePeerConnection.setLocalDescription(description);
+	  trace("++++++++++Answer from remotePeerConnection: \n" + description.sdp);
+	  localSdpDesc.value = JSON.stringify(description);
+	}
+	
+	function hangup() {
+	  trace("++++++++++Ending call");
+	  remotePeerConnection.close();
+	  remotePeerConnection = null;
+	  hangupButton.disabled = true;
+	}
+	
+	/*iceConnectionState的变化，判断是否对端断了*/
+	function goticeConnectionState(event)
+	{
+		trace("++++++++++ goticeConnectionState:"+this.iceConnectionState);
+	}
+	
+	//获得远端的流
+	function gotRemoteStream(event){
+	  remoteVideo.src = URL.createObjectURL(event.stream);
+	  trace("++++++++++Received remote stream");
+	}
+	
+	function gotRemoteIceCandidate(event){
+	  if (event.candidate) {
+		localCandidateArray[localCandidateIndex] = event.candidate;
+		localCandidateIndex++;
+		localCandidates.value = JSON.stringify(localCandidateArray);
+		trace("++++++++++Remote ICE candidate: \n " + event.candidate.candidate);
+	  }
+	}
+	
+	function handleError(e){alert(e);}
+	
+	function gotReceiveChannel()
+	{
+		trace('Receive Channel Callback');
+        receiveChannel = event.channel;
+        receiveChannel.onmessage = handleMessage;
+        receiveChannel.onopen = handleReceiveChannelStateChange;
+        receiveChannel.onclose = handleReceiveChannelStateChange;
+	}
+	
+	function handleMessage(event) {
+		trace('Received message from channel: ' + event.data);
+		txtDataChannel.value = event.data;
+		receiveChannel.send("Ack:"+event.data);
+    }
+	
+	function handleReceiveChannelStateChange()
+	{
+		var readyState = remotePeerConnection.readyState;
+        trace('receive channel state is: ' + readyState);
+		// If channel ready, enable user's input
+		/*if (readyState == "open") {
+		sendChannelButton.disabled = false;
+		} else {
+		sendChannelButton.disabled = true;
+		}*/
+	}
+	
+  </script>
+</body>
+</html>

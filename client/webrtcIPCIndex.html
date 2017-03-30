@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"  >
+<head >
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="initial-scale=1.0,width=device-width" / >
+    <title>IPC模拟客户端: 未注册</title>
+    <!-- script src="../jquery-1.11.2.min.js"></script -->
+    <script src="sdp.js"></script>
+    <script src="webrtcIPCIndex.js"></script>
+    <link  rel="stylesheet" href="webrtcIPCIndex.css" type="text/css" media="screen">
+</head>
+
+<body>
+<a href="#">
+<h2>IPC模拟客户端</h2>
+</a>
+<p id="pageState" hidden="true">客户端状态：未注册</p>
+<div id="wrapper"> 
+  <!-- the header and navigation -->
+  <div id="header">
+    <div id="navigation">
+      <ul>
+        <li ><input id="agentReg" type="button" value="IPC注册"></li>
+        <li><input id="getMedia" type="button" value="获取摄像头视频" ></li>
+        <li><input id="agentQuit" type="button" value="IPC退出"></li>
+      </ul>
+    </div>
+  </div>
+  <!-- the content -->
+  <div id="sidebar" hidden="true">  
+  </div>
+  <div id="content">
+    <div align="center">
+      <video id="localVideo"  autoplay  ></video>
+    </div>
+  </div>
+ 
+</div>
+</body>
+</html>
